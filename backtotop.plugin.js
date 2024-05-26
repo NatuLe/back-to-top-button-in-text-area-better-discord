@@ -4,7 +4,7 @@
  * @author Natsuki Yūko
  */
 
-const { React, DOM, Patcher, UI, Utils, ReactUtils, ContextMenu, Webpack: _Webpack } = new BdApi("InvisibleTyping");
+const { React, DOM, Patcher, UI, Utils, ReactUtils, Webpack: _Webpack } = new BdApi("InvisibleTyping");
 
 const Webpack = {
     ..._Webpack,
@@ -89,10 +89,25 @@ async function patchTextAreaButtons(meta) {
     });
 
     Patcher.after(instance, "type", (_, [props], res) => {
-        // Assign a unique ID to each button instance
         const uniqueId = `${props.channel?.id || 'default'}-${Date.now()}`;
-        res.props.children.unshift(React.createElement(BackToTopButton, { ...props, uniqueId }));
+        const existingButton = res.props.children.find(child => child && child.type && child.type.name === "BackToTopButton");
+        
+        if (!existingButton) {
+            res.props.children.unshift(React.createElement(BackToTopButton, { ...props, uniqueId }));
+        }
     });
+}
+
+function setupButtonPatch(meta) {
+    // Initial patch
+    patchTextAreaButtons(meta).catch(() => {});
+
+    // Setup a MutationObserver to re-apply the patch if necessary
+    const observer = new MutationObserver(() => {
+        patchTextAreaButtons(meta).catch(() => {});
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 module.exports = class InvisibleTyping {
@@ -138,12 +153,14 @@ module.exports = class InvisibleTyping {
             { searchExports: true, filter: Webpack.Filters.byPrototypeFields("renderTooltip") }
         );
 
-        patchTextAreaButtons(this.meta).catch(() => {});
+        setupButtonPatch(this.meta);
     }
 
     stop() {
         this.cleanup.forEach(clean => clean());
     }
+
+   
 };
 
 // Helper function
@@ -177,3 +194,4 @@ function onceAdded(selector, callback, signal) {
 
     signal.addEventListener("abort", cancel);
 }
+
