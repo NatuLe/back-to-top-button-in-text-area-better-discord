@@ -2,6 +2,7 @@
  * @name BackToTopButton
  * @description This plugin adds a button to the Discord textarea that, when clicked, navigates to the top of the current path based on invisible typing and jumptotop plugins.
  * @author Natsuki Yūko
+ * @version 1.0.0
  */
 
 const { React, DOM, Patcher, UI, Utils, ReactUtils, Webpack: _Webpack } = new BdApi("InvisibleTyping");
@@ -108,6 +109,15 @@ function setupButtonPatch(meta) {
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Cleanup logic
+    return () => {
+        observer.disconnect();
+        const buttons = document.getElementsByClassName("back-to-top-button");
+        while (buttons.length > 0) {
+            buttons[0].remove();
+        }
+    };
 }
 
 module.exports = class InvisibleTyping {
@@ -116,7 +126,12 @@ module.exports = class InvisibleTyping {
         this.cleanup = new Set([
             () => Patcher.unpatchAll(),
             () => DOM.removeStyle(),
-            () => new Set(document.getElementsByClassName("back-to-top-button")).forEach(el => el.unmount?.())
+            () => {
+                const buttons = document.getElementsByClassName("back-to-top-button");
+                while (buttons.length > 0) {
+                    buttons[0].remove();
+                }
+            }
         ]);
     }
 
@@ -153,14 +168,15 @@ module.exports = class InvisibleTyping {
             { searchExports: true, filter: Webpack.Filters.byPrototypeFields("renderTooltip") }
         );
 
-        setupButtonPatch(this.meta);
+        const cleanupObserver = setupButtonPatch(this.meta);
+        this.cleanup.add(cleanupObserver);
     }
 
     stop() {
         this.cleanup.forEach(clean => clean());
     }
 
-   
+    
 };
 
 // Helper function
@@ -194,4 +210,3 @@ function onceAdded(selector, callback, signal) {
 
     signal.addEventListener("abort", cancel);
 }
-
